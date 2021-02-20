@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+    <meta charset="utf-8">
+    <title>demo</title>
+
+    <body>
+
+    </body>
+    <script>
+        var canvas = document.createElement("canvas"),
+            canvas2D = canvas.getContext("2d");
+        canvas.id = "demo";
+        canvas.style.cssText = "position:fixed;top:0;left:0;z-index:-1;opacity:1";
+        document.getElementsByTagName("body")[0].appendChild(canvas);
+
+        // websocket.onMessage(data => {
+        //     ReceiveMessage(data);
+        // })
+
+        function ReceiveMessage(data) {
+            const variables = {};
+            const fns = {
+                drawPoint: drawPoint,
+                drawLine: drawLine,
+                drawCircle: drawCircle,
+                rotate: rotate,
+                drawLineShape: drawLineShape,
+                do: (...args) => args[args.length - 1],
+                var: (name, v) => {
+                    variables[name] = v;
+                },
+            };
+            const parseInstruction = (ins) => {
+                if (variables[ins]) {
+                    return variables[ins];
+                }
+                if (!Array.isArray(ins)) {
+                    return ins;
+                }
+                const [fName, args] = ins;
+                if (fName == "function") {
+                    return parseFnInstruction(args);
+                }
+                const fn = variables[fName] || fns[fName];
+                return fn(...args.map(parseInstruction));
+            };
+            const mapArgsWithValues = (body, cache) => {
+                let newbody = [];
+                body.forEach((o, index) => {
+                    if (Array.isArray(o)) {
+                        newbody[index] = mapArgsWithValues(o, cache);
+                    } else {
+                        newbody[index] = cache[o] || o;
+                    }
+                })
+                return newbody;
+            };
+            const parseFnInstruction = ([args, body]) => {
+                return (...values) => {
+                    let cache = {};
+                    args.forEach((arg, index) => {
+                        cache[arg] = values[index];
+                    });
+                    let newbody = mapArgsWithValues(body, cache);
+                    return parseInstruction(newbody);
+                };
+            };
+            parseInstruction(data);
+        }
+
+        var data = ["do", [
+            ["var", ["drawTriangle", ["function", [
+                ["left", "top", "right", "color"],
+                ["do", [
+                    ["drawLine", ["left", "top", "color"]],
+                    ["drawLine", ["top", "right", "color"]],
+                    ["drawLine", ["left", "right", "color"]]
+                ]]
+            ]]]],
+            ["drawTriangle", [{
+                x: 0,
+                y: 0
+            }, {
+                x: 100,
+                y: 0
+            }, {
+                x: 0,
+                y: 100
+            }, 'blue']],
+            ["drawTriangle", [{
+                x: 100,
+                y: 100
+            }, {
+                x: 100,
+                y: 0
+            }, {
+                x: 0,
+                y: 100
+            }, 'green']],
+        ]];
+
+        ReceiveMessage(data);
+
+        // drawPoint({
+        //     x: 45,
+        //     y: 45
+        // }, 'green');
+
+        // drawLine({
+        //     x: 0,
+        //     y: 0
+        // }, {
+        //     x: 100,
+        //     y: 100
+        // }, 'blue');
+
+        // drawCircle({
+        //     x: 50,
+        //     y: 50
+        // }, 50, 'red');
+
+        // rotate(() => {
+        //     drawLine({
+        //         x: 0,
+        //         y: 0
+        //     }, {
+        //         x: 100,
+        //         y: 100
+        //     }, 'yellow');
+        // }, 20);
+
+        function drawPoint(point, color) {
+            canvas2D.fillStyle = color;
+            canvas2D.fillRect(point.x, point.y, 10, 10);
+        }
+
+        function drawLine(start, end, color) {
+            canvas2D.beginPath();
+            canvas2D.strokeStyle = color;
+            canvas2D.moveTo(start.x, start.y);
+            canvas2D.lineTo(end.x, end.y);
+            canvas2D.stroke();
+        }
+
+        function drawLineShape(start, end, color) {
+            return () => {
+                canvas2D.beginPath();
+                canvas2D.strokeStyle = color;
+                canvas2D.moveTo(start.x, start.y);
+                canvas2D.lineTo(end.x, end.y);
+                canvas2D.stroke();
+            }
+        }
+
+        function drawCircle(point, radius, color) {
+            canvas2D.beginPath();
+            canvas2D.strokeStyle = color;
+            canvas2D.arc(point.x, point.y, radius, 0, 2 * Math.PI);
+            canvas2D.stroke();
+        }
+
+        function rotate(shape, Angle) {
+            canvas2D.rotate(Angle * Math.PI / 180);
+            shape();
+            canvas2D.rotate(-Angle * Math.PI / 180);
+        }
+    </script>
+
+</html>
